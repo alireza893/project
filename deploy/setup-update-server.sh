@@ -146,6 +146,10 @@ server {
     autoindex off;
 
     location /updates/ {
+        # The page lives at /, not here. Without this, index.html sitting in
+        # this directory would also answer /updates/ instead of being refused.
+        index index_disabled.html;
+
         # Installers are immutable once published, so they cache well.
         location ~* \.(exe|dmg|zip|blockmap)\$ {
             expires 30d;
@@ -164,6 +168,15 @@ server {
     location = /health {
         default_type text/plain;
         return 200 "ok\n";
+    }
+
+    # The download page, rebuilt after every upload by generate-index.sh.
+    # Never cached, so a new release shows up immediately.
+    location = / {
+        root /var/www/updates;
+        try_files /index.html =404;
+        expires -1;
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
     }
 
     location / {

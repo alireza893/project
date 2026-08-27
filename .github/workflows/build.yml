@@ -184,6 +184,21 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes "$remote" \
             "bash /tmp/prune-$target.sh 3 $target; rm -f /tmp/prune-$target.sh"
 
+      # Rebuild the download page from what is now on disk, so it lists the new
+      # release and drops anything pruning just removed. Both jobs run this;
+      # it only reads the directories, so the later one simply wins.
+      - name: Rebuild the download page
+        if: "!contains(github.ref_name, '-')"
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=$([ "${{ runner.os }}" = "macOS" ] && echo mac || echo win)
+          remote="${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}"
+          scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            deploy/generate-index.sh "$remote:/tmp/genindex-$target.sh"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes "$remote" \
+            "bash /tmp/genindex-$target.sh; rm -f /tmp/genindex-$target.sh"
+
       # Releases do not count toward the artifact storage quota, so this is a
       # free fallback if the droplet is ever unreachable.
       - name: Publish to Releases
