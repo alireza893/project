@@ -77,10 +77,21 @@ while IFS= read -r v; do
       "$3" "$(basename "$1")" "$2" "$size"
   }
 
+  # Older releases are kept so a bad version can be rolled back, but they are
+  # dimmed so nobody downloads one by mistake.
   badge=""
+  cls="rel"
   if [ "$first" = 1 ]; then
     badge='<span class="badge">آخرین نسخه</span>'
     first=0
+  else
+    badge='<span class="badge old">نسخه قبلی</span>'
+    cls="rel prev"
+    # Heading printed once, above the first older release.
+    if [ "$first" = 0 ]; then
+      rows+='      <p class="sec-title">نسخه‌های قبلی</p>'$'\n'
+      first=2
+    fi
   fi
 
   # Prefer the newest mtime of the two files as the release date.
@@ -93,7 +104,7 @@ while IFS= read -r v; do
   done
 
   rows+=$(cat <<ROW
-      <section class="rel">
+      <section class="$cls">
         <header class="rel-h">
           <div class="rel-v">
             <h2>نسخه $v</h2>
@@ -198,6 +209,19 @@ cat > "$OUT" <<HTML
   .badge {
     font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
     background: var(--accent); color: #fff; letter-spacing: .01em;
+  }
+  /* Older versions stay available for rollback, but recede visually so the
+     current release is the obvious choice. */
+  .badge.old { background: rgba(127,127,127,.22); color: var(--muted); }
+  .rel.prev { background: transparent; box-shadow: none; }
+  .rel.prev .rel-h h2 { font-size: 19px; font-weight: 500; }
+  .rel.prev .dl { background: transparent; color: var(--accent); border: 1px solid var(--stroke); }
+  .rel.prev .dl:hover { background: rgba(127,127,127,.10); }
+  .rel.prev .dl-s { opacity: .7; }
+
+  .sec-title {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    letter-spacing: .02em; margin: 30px 4px 12px;
   }
 
   .rel-d { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
