@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs/promises')
 const crypto = require('node:crypto')
+const { initUpdater } = require('./updater.cjs')
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL
 const isMac = process.platform === 'darwin'
@@ -99,7 +100,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  createWindow()
+  const win = createWindow()
+  initUpdater(win)
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -132,6 +134,8 @@ function safeEqual(a, b) {
 ipcMain.handle('auth:login', (_e, username, password) =>
   safeEqual(sha(username), CREDENTIALS.user) && safeEqual(sha(password), CREDENTIALS.pass)
 )
+
+ipcMain.handle('app:version', () => app.getVersion())
 
 ipcMain.handle('db:read', () => readDb())
 ipcMain.handle('db:write', (_e, db) => writeDb(db))

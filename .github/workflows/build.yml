@@ -1,8 +1,16 @@
 name: Build Desktop Apps
 
-# Builds the macOS .dmg and the Windows .exe installer on GitHub's own runners.
-# Runs automatically on every push to main. Pushing a v* tag additionally
-# publishes both installers to a GitHub Release.
+# Two separate jobs, so day-to-day pushes cost no artifact storage at all:
+#
+#   push to main  -> "check" only: compiles the app to catch breakage early.
+#                    No installer is produced and nothing is uploaded.
+#
+#   tag v*        -> full build of the macOS .dmg and Windows .exe, uploaded
+#                    straight to the update server over scp and attached to a
+#                    GitHub Release. Nothing is stored as a workflow artifact.
+#
+# GitHub bills artifact storage, but not Releases, so this stays free no matter
+# how often main is pushed.
 
 on:
   push:
@@ -15,8 +23,44 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # ------------------------------------------------------------------ #
+  # Every push to main: does it still build?                            #
+  # ------------------------------------------------------------------ #
+  check:
+    name: Build check
+    if: "!startsWith(github.ref, 'refs/tags/v')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Only the renderer is compiled. Packaging an installer here would be
+      # slow and would produce a file nobody downloads.
+      - name: Build the renderer
+        run: npm run build
+
+      - name: Check the Electron entry points parse
+        run: |
+          node --check electron/main.cjs
+          node --check electron/preload.cjs
+          node --check electron/updater.cjs
+          node --check electron/config.cjs
+
+  # ------------------------------------------------------------------ #
+  # Tagged release: build the real installers and publish them          #
+  # ------------------------------------------------------------------ #
+  release:
     name: ${{ matrix.name }}
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -27,13 +71,13 @@ jobs:
           - os: macos-latest
             name: macOS (dmg)
             target: dist:mac
-            artifact: PishFaktor-macOS
             pattern: release/*.dmg
           - os: windows-latest
             name: Windows (exe)
             target: dist:win
-            artifact: PishFaktor-Windows
-            pattern: release/*.exe
+            pattern: |
+              release/*.exe
+              release/latest.yml
 
     steps:
       - name: Check out repository
@@ -58,21 +102,54 @@ jobs:
 
       - name: List build output
         shell: bash
-        run: ls -la release/ || echo "release/ directory was not created"
+        run: ls -la release/
 
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.pattern }}
-          if-no-files-found: error
-          # Installers are large, so expire them quickly and skip recompression
-          # (a .dmg / .exe is already compressed) to limit artifact storage use.
-          retention-days: 5
-          compression-level: 0
+      - name: Write the macOS version manifest
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          dmg=$(basename "$(ls release/*.dmg | head -1)")
+          printf '{\n  "version": "%s",\n  "url": "%s/updates/mac/%s"\n}\n' \
+            "$version" "${{ secrets.UPDATE_HOST }}" "$dmg" > release/latest-mac.json
+          cat release/latest-mac.json
 
+      - name: Add the update server to known_hosts
+        if: "!contains(github.ref_name, '-')"
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          # Pin the host key so the upload cannot be silently redirected.
+          echo "${{ secrets.DEPLOY_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Install the deploy key
+        if: "!contains(github.ref_name, '-')"
+        shell: bash
+        run: |
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      # A pre-release tag (v1.0.1-beta.1, v2.0.0-rc.1) is built and attached to
+      # a GitHub Release for testing, but is NOT sent to the update server, so
+      # it never reaches users' machines.
+      - name: Upload to the update server
+        if: "!contains(github.ref_name, '-')"
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            src="release/*.dmg release/latest-mac.json"; dest="mac"
+          else
+            src="release/*.exe release/latest.yml"; dest="win"
+          fi
+          # shellcheck disable=SC2086
+          scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            $src "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}:/var/www/updates/$dest/"
+
+      # Releases do not count toward the artifact storage quota, so this is a
+      # free fallback if the droplet is ever unreachable.
       - name: Publish to Releases
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.pattern }}

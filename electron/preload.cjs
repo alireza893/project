@@ -13,4 +13,14 @@ contextBridge.exposeInMainWorld('api', {
   exportBackup: () => ipcRenderer.invoke('backup:export'),
   importBackup: () => ipcRenderer.invoke('backup:import'),
   platform: process.platform,
+  appVersion: () => ipcRenderer.invoke('app:version'),
+
+  /* Update notifications pushed from the main process.
+     Each returns an unsubscribe function, so React effects can clean up. */
+  onUpdate: (event, cb) => {
+    const channel = `update:${event}` // 'available' | 'progress' | 'ready'
+    const handler = (_e, payload) => cb(payload)
+    ipcRenderer.on(channel, handler)
+    return () => ipcRenderer.removeListener(channel, handler)
+  },
 })
