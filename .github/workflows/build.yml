@@ -92,6 +92,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The tag is only a git label; the installer is named from package.json.
+      # If they disagree, users are offered a file whose version does not match
+      # the manifest and auto-update breaks, so fail before anything is built.
+      - name: Check the tag matches package.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          tag="${tag%%-*}"                       # strip any -beta.1 suffix
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME expects version $tag, but package.json is $pkg."
+            echo "Bump it with 'npm version <new-version>', which tags the commit for you."
+            exit 1
+          fi
+          echo "version $pkg matches tag $GITHUB_REF_NAME"
+
       - name: Build installer
         run: npm run ${{ matrix.target }}
         env:
@@ -153,3 +170,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.pattern }}
+          # A tag carrying a suffix (v1.0.1-beta.1) is a test build, so mark it
+          # as a pre-release rather than presenting it as the current version.
+          prerelease: ${{ contains(github.ref_name, '-') }}
