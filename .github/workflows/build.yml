@@ -164,6 +164,26 @@ jobs:
           scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
             $src "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}:/var/www/updates/$dest/"
 
+      # Each release adds ~370 MB. Left unchecked the droplet's disk fills up,
+      # which would stop the Telegram bot's database as well as updates, so old
+      # installers are removed as soon as the new one is safely in place.
+      - name: Remove superseded installers
+        if: "!contains(github.ref_name, '-')"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Prune only this platform's directory. The two jobs finish at
+          # different times, so pruning both here could delete a version the
+          # other platform has not uploaded yet.
+          if [ "${{ runner.os }}" = "macOS" ]; then target=mac; else target=win; fi
+          remote="${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}"
+          # A per-platform name keeps the two concurrent jobs from overwriting
+          # each other's copy of the script.
+          scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            deploy/prune-old-releases.sh "$remote:/tmp/prune-$target.sh"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes "$remote" \
+            "bash /tmp/prune-$target.sh 3 $target; rm -f /tmp/prune-$target.sh"
+
       # Releases do not count toward the artifact storage quota, so this is a
       # free fallback if the droplet is ever unreachable.
       - name: Publish to Releases
