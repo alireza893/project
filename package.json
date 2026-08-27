@@ -1,0 +1,87 @@
+{
+  "name": "pishfaktor",
+  "version": "1.0.0",
+  "description": "Proforma invoice and product management system",
+  "author": "Alireza Mosavi",
+  "license": "MIT",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c cyan,magenta \"vite\" \"wait-on tcp:5273 && cross-env VITE_DEV_SERVER_URL=http://localhost:5273 electron .\"",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "dist": "vite build && electron-builder --mac --dir",
+    "dist:mac": "vite build && electron-builder --mac --universal",
+    "dist:win": "vite build && electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "ir.pishfaktor.app",
+    "productName": "PishFaktor",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "artifactName": "PishFaktor-${version}.${ext}",
+      "icon": "build/icon.png",
+      "identity": null
+    },
+    "dmg": {
+      "title": "PishFaktor"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "PishFaktor-Setup-${version}.${ext}",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "سامانه پیش‌فاکتور",
+      "language": "1065"
+    }
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^13.1.1",
+    "lucide-react": "^1.33.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "three": "^0.185.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.0",
+    "autoprefixer": "^10.5.4",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2",
+    "wait-on": "^9.1.0"
+  }
+}

@@ -1,0 +1,217 @@
+@import 'tailwindcss';
+
+/* ---------- Font ----------
+   IRANYekan is a commercial font and cannot be redistributed, so Vazirmatn
+   (OFL) is bundled instead; its letterforms are very close. If you hold an
+   IRANYekan license, drop its woff2 files into this folder and change the
+   file names in the block below. */
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('../assets/fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('../assets/fonts/Vazirmatn-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('../assets/fonts/Vazirmatn-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('../assets/fonts/Vazirmatn-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: 'Vazirmatn', 'IRANYekanX', 'IRANYekan', -apple-system, system-ui, sans-serif;
+
+  --color-glass-50: oklch(98% 0.004 260);
+  --color-ink-900: oklch(22% 0.02 265);
+  --color-ink-700: oklch(38% 0.02 265);
+  --color-ink-500: oklch(55% 0.02 265);
+
+  /* A formal, muted accent rather than a colorful one */
+  --color-brand-400: oklch(45% 0.02 250);
+  --color-brand-500: oklch(32% 0.02 250);
+  --color-brand-600: oklch(22% 0.01 250);
+
+  --color-mint-500: oklch(48% 0.09 165);
+  --color-amber-500: oklch(58% 0.10 70);
+  --color-rose-500: oklch(52% 0.16 22);
+
+  --radius-mac: 14px;
+  --radius-macxl: 22px;
+}
+
+/* Single theme: light, black and white, formal. No dark mode. */
+:root {
+  color-scheme: light;
+  --bg-1: oklch(97% 0 0);
+  --bg-2: oklch(93% 0 0);
+  --panel: 255 255 255;
+  --panel-a: 0.72;
+  --stroke: 15 18 24;
+  --stroke-a: 0.14;
+  --text: oklch(18% 0 0);
+  --text-dim: oklch(45% 0 0);
+  --shadow-c: 220 12% 25%;
+
+  /* Surface for inputs and buttons */
+  --field: 255 255 255;
+  --field-a: 0.86;
+  --field-stroke: 15 18 24;
+  --field-stroke-a: 0.18;
+  --scrim: 15 18 24;
+  --scrim-a: 0.34;
+}
+
+* { -webkit-font-smoothing: antialiased; }
+
+html, body { height: 100%; }
+
+/* zoom already scales the units inside the element, so 100% here means the
+   full window height and no manual division is needed.
+   dvh is used so this does not depend on a chain of percentages. */
+#root { height: calc(100dvh / 1.25); }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: transparent; /* The 3D canvas paints the background */
+  overflow: hidden;
+  user-select: none;
+}
+
+/* The whole UI is scaled up 125%. The layout is untouched and only the scale
+   changes. This is disabled when printing. */
+#root { zoom: 1.25; }
+
+/* Persian digits across the whole UI */
+.fa-num { font-feature-settings: 'ss02'; }
+
+/* Draggable title bar on macOS */
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+/* ---------- macOS glass effect ---------- */
+@utility glass {
+  background: rgb(var(--panel) / var(--panel-a));
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgb(var(--stroke) / var(--stroke-a));
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.35) inset,
+    0 10px 30px -12px hsl(var(--shadow-c) / 0.28);
+}
+
+@utility glass-strong {
+  background: rgb(var(--panel) / calc(var(--panel-a) + 0.24));
+  backdrop-filter: blur(46px) saturate(200%);
+  -webkit-backdrop-filter: blur(46px) saturate(200%);
+  border: 1px solid rgb(var(--stroke) / calc(var(--stroke-a) + 0.14));
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.45) inset,
+    0 24px 60px -20px hsl(var(--shadow-c) / 0.42);
+}
+
+/* Sidebar drop shadow. The layout is RTL, so the sidebar's inner edge is on
+   its left and the shadow spreads that way.
+   !important is needed because the glass class comes later in the CSS and would
+   otherwise override box-shadow (both have the same specificity). */
+.sidebar-shadow {
+  /* Same weight as the adjacent card shadows, not heavier */
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.45) inset,
+    -10px 0 30px -12px hsl(var(--shadow-c) / 0.28) !important;
+  z-index: 20;
+}
+
+/* Active menu item highlight in the sidebar */
+.nav-active-pill {
+  background: rgb(255 255 255 / 0.92);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.9) inset,
+    0 1px 2px 0 hsl(var(--shadow-c) / 0.10),
+    0 6px 16px -6px hsl(var(--shadow-c) / 0.28);
+  border: 1px solid rgb(var(--stroke) / 0.10);
+}
+
+/* Surface for inputs and buttons: theme-driven, not a hard-coded white */
+@utility field-surface {
+  background: rgb(var(--field) / var(--field-a));
+  border: 1px solid rgb(var(--field-stroke) / var(--field-stroke-a));
+  color: var(--text);
+}
+
+/* Colored glow behind cards for a bit more depth */
+@utility sheen {
+  position: relative;
+  overflow: hidden;
+}
+@utility sheen-on {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, rgb(122 162 255 / 0.16), transparent 42%, rgb(196 155 255 / 0.14));
+  pointer-events: none;
+}
+
+/* Thin macOS-style scrollbar */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(140 150 170 / 0.4);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(120 130 150 / 0.65); background-clip: content-box; }
+
+input, textarea, select, button { font-family: inherit; }
+input, textarea { user-select: text; }
+
+/* Cursor: in Tailwind v4, buttons default to cursor:default */
+button:not(:disabled), select, [role='button'], summary, label:has(input[type='checkbox']) {
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; }
+input[type='text'], input[type='password'], input[type='number'], input:not([type]), textarea {
+  cursor: text;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ---------- Invoice printing ---------- */
+@media print {
+  @page { size: A4; margin: 0; }
+  body { overflow: visible; background: #fff !important; }
+  /* The UI zoom must not affect the A4 sheet */
+  #root { zoom: 1 !important; }
+  .no-print { display: none !important; }
+  .print-area {
+    position: fixed !important;
+    inset: 0 !important;
+    margin: 0 !important;
+    padding: 14mm 12mm !important;
+    width: 210mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    z-index: 9999 !important;
+    border-radius: 0 !important;
+  }
+  .print-area * { backdrop-filter: none !important; }
+}

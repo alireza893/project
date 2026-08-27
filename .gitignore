@@ -1,0 +1,30 @@
+# Dependencies and build output
+node_modules/
+dist/
+release/
+.vite/
+
+# Business spreadsheets - purchase prices, profit margins and product lists.
+# These are confidential and must not be pushed to GitHub.
+*.xlsx
+*.xls
+*.csv
+
+# Data backup files (contain customers and invoices)
+backup-pishfaktor-*.json
+
+# Operating system and tooling
+.DS_Store
+*.log
+.env
+.env.local
+
+# Local editor and tool settings (machine-specific)
+.vscode/
+.idea/
+.fleet/
+.zed/
+.cursor/
+.claude/
+.aider*
+.continue/

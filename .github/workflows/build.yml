@@ -1,0 +1,78 @@
+name: Build Desktop Apps
+
+# Builds the macOS .dmg and the Windows .exe installer on GitHub's own runners.
+# Runs automatically on every push to main. Pushing a v* tag additionally
+# publishes both installers to a GitHub Release.
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Keep building the other platform even if one of them fails.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS (dmg)
+            target: dist:mac
+            artifact: PishFaktor-macOS
+            pattern: release/*.dmg
+          - os: windows-latest
+            name: Windows (exe)
+            target: dist:win
+            artifact: PishFaktor-Windows
+            pattern: release/*.exe
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run ${{ matrix.target }}
+        env:
+          # The app is not code-signed, so stop electron-builder from
+          # searching for a signing identity and failing the build.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List build output
+        shell: bash
+        run: ls -la release/ || echo "release/ directory was not created"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+          # Installers are large, so expire them quickly and skip recompression
+          # (a .dmg / .exe is already compressed) to limit artifact storage use.
+          retention-days: 5
+          compression-level: 0
+
+      - name: Publish to Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.pattern }}
