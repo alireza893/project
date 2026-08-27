@@ -18,22 +18,69 @@
 
 set -euo pipefail
 
+# Make a failure impossible to miss: without this, piping the script through
+# tail or less hides the non-zero exit status and a half-finished run looks
+# like a successful one.
+trap 'echo; echo "!!! SETUP FAILED at line $LINENO. Nothing further was changed." >&2; exit 1' ERR
+
 DEPLOY_USER=deploy
 WEB_ROOT=/var/www/updates
 # Serving on a separate port keeps the existing site on port 80 untouched.
 UPDATE_PORT="${UPDATE_PORT:-8081}"
 
 echo "==> Checking that port $UPDATE_PORT is free"
-if ss -lntH "sport = :$UPDATE_PORT" 2>/dev/null | grep -q .; then
-  echo "ERROR: port $UPDATE_PORT is already in use:" >&2
-  ss -lntp "sport = :$UPDATE_PORT" >&2
-  echo "Re-run with a different port, e.g.  UPDATE_PORT=8082 bash $0" >&2
-  exit 1
+
+# ss can miss a listener bound only to IPv6 or inside another namespace, so
+# fall back to actually opening a connection. Taking a port that another
+# service owns would break that service.
+port_in_use() {
+  ss -lntH "sport = :$UPDATE_PORT" 2>/dev/null | grep -q . && return 0
+  (exec 3<>"/dev/tcp/127.0.0.1/$UPDATE_PORT") 2>/dev/null && { exec 3<&-; return 0; }
+  return 1
+}
+
+# Is the listener our own nginx from a previous run, rather than something else?
+port_is_our_nginx() {
+  [ -f /etc/nginx/sites-available/updates ] || return 1
+  ss -lntpH "sport = :$UPDATE_PORT" 2>/dev/null | grep -q 'nginx' && return 0
+  # If ss shows nothing but the port answers, only treat it as ours when nginx
+  # is running and our site is the one configured on this port.
+  systemctl is-active --quiet nginx 2>/dev/null &&
+    grep -qE "listen[[:space:]]+(\[::\]:)?$UPDATE_PORT;" /etc/nginx/sites-available/updates
+}
+
+if port_in_use; then
+  # nginx holding the port from a previous run of this script is fine: the
+  # config is simply rewritten. Anything else is a genuine conflict, and
+  # taking the port would break whatever already owns it.
+  if port_is_our_nginx; then
+    echo "    port $UPDATE_PORT is held by this script's own nginx site, re-running"
+  else
+    echo "ERROR: port $UPDATE_PORT is already in use by another service:" >&2
+    ss -lntp "sport = :$UPDATE_PORT" >&2
+    echo "Re-run with a different port, e.g.  UPDATE_PORT=8082 bash $0" >&2
+    exit 1
+  fi
 fi
 
 echo "==> Installing nginx (existing sites are left untouched)"
-apt-get update -qq
-apt-get install -y nginx
+if command -v nginx >/dev/null 2>&1; then
+  echo "    nginx is already installed, skipping"
+else
+  # A DigitalOcean mirror that is mid-sync makes apt-get update fail on the
+  # dep11 app-metadata files. Those are irrelevant to installing nginx, so a
+  # refresh failure must not abort the script.
+  apt-get update -qq || echo "    (apt-get update reported errors, continuing)"
+
+  if ! apt-get install -y nginx; then
+    echo "    retrying without the app-metadata index" >&2
+    # dep11 is what the broken mirror serves; skipping it avoids the failure.
+    apt-get -o APT::Get::List-Cleanup=0 \
+            -o Acquire::IndexTargets::deb::DEP-11::DefaultEnabled=false \
+            update -qq || true
+    apt-get install -y nginx
+  fi
+fi
 
 echo "==> Creating $WEB_ROOT"
 mkdir -p "$WEB_ROOT/win" "$WEB_ROOT/mac"
@@ -42,7 +89,14 @@ echo "==> Creating the $DEPLOY_USER user"
 # The deploy user owns only the update directory, so a leaked deploy key
 # cannot be used to touch the rest of the server.
 if ! id "$DEPLOY_USER" >/dev/null 2>&1; then
-  adduser --system --group --shell /bin/bash --home "/home/$DEPLOY_USER" "$DEPLOY_USER"
+  # useradd is in base Ubuntu; adduser is a Debian wrapper that is not always
+  # present in minimal images.
+  if command -v adduser >/dev/null 2>&1; then
+    adduser --system --group --shell /bin/bash --home "/home/$DEPLOY_USER" "$DEPLOY_USER"
+  else
+    useradd --system --user-group --shell /bin/bash \
+            --home-dir "/home/$DEPLOY_USER" --create-home "$DEPLOY_USER"
+  fi
 fi
 mkdir -p "/home/$DEPLOY_USER/.ssh"
 touch "/home/$DEPLOY_USER/.ssh/authorized_keys"
@@ -102,9 +156,20 @@ ln -sf /etc/nginx/sites-available/updates /etc/nginx/sites-enabled/updates
 # whatever is already being served on port 80.
 
 echo "==> Testing the nginx configuration"
-# If this fails, nothing is reloaded, so the running site stays up.
+# If this fails the script stops here, so the running site is never reloaded
+# with a broken config.
 nginx -t
-systemctl reload nginx
+
+echo "==> Reloading nginx"
+if systemctl is-active --quiet nginx 2>/dev/null; then
+  # Reload rather than restart: existing connections are not dropped.
+  systemctl reload nginx
+elif command -v systemctl >/dev/null 2>&1; then
+  systemctl enable --now nginx
+else
+  # No systemd (a container, for example).
+  nginx -s reload 2>/dev/null || nginx
+fi
 
 echo "==> Opening the firewall for port $UPDATE_PORT"
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
