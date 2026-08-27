@@ -15,7 +15,7 @@ const isMac = process.platform === 'darwin'
 const UPDATE_HOST = require('./config.cjs').UPDATE_HOST.replace(/\/+$/, '')
 
 /** Wait this long after launch before checking, so startup stays fast. */
-const FIRST_CHECK_DELAY = 8_000
+const FIRST_CHECK_DELAY = 3_000
 /** Then re-check periodically, for machines that stay open for days. */
 const CHECK_INTERVAL = 6 * 60 * 60 * 1000
 
@@ -26,7 +26,10 @@ const CHECK_INTERVAL = 6 * 60 * 60 * 1000
 function setupWindows(win) {
   const { autoUpdater } = require('electron-updater')
 
-  autoUpdater.autoDownload = true
+  // Ask before downloading. The installer is over 100 MB and the update server
+  // is slow, so downloading silently leaves the app busy for a long time with
+  // nothing on screen to explain it.
+  autoUpdater.autoDownload = false
   // Installing on quit is the least disruptive moment: no forced restart.
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.setFeedURL({
@@ -38,7 +41,26 @@ function setupWindows(win) {
     if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
   }
 
-  autoUpdater.on('update-available', (info) => send('update:available', { version: info.version }))
+  const mb = (n) => (n ? `${Math.round(n / 1048576)} مگابایت` : '')
+
+  autoUpdater.on('update-available', async (info) => {
+    send('update:available', { version: info.version })
+
+    const size = mb(info.files?.[0]?.size)
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'info',
+      buttons: ['دانلود و نصب', 'بعداً'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'نسخه جدید موجود است',
+      message: `نسخه ${info.version} منتشر شده است.`,
+      detail: size
+        ? `حجم دانلود: ${size}\n\nدانلود در پس‌زمینه انجام می‌شود و می‌توانید به کار خود ادامه دهید. بسته به سرعت اینترنت ممکن است چند دقیقه طول بکشد.`
+        : 'دانلود در پس‌زمینه انجام می‌شود و می‌توانید به کار خود ادامه دهید.',
+    })
+    if (response === 0) autoUpdater.downloadUpdate().catch(() => {})
+  })
+
   autoUpdater.on('download-progress', (p) => send('update:progress', { percent: Math.round(p.percent) }))
 
   autoUpdater.on('update-downloaded', (info) => {
@@ -148,12 +170,21 @@ function initUpdater(win) {
     return
   }
 
-  try {
-    if (isMac) setupMac(win)
-    else setupWindows(win)
-  } catch (err) {
-    console.error('[updater] failed to start:', err?.message || err)
+  // Wait until the window is actually on screen. A modal dialog attached to a
+  // window that has not been shown yet sits behind it, which is why an update
+  // prompt could appear to arrive minutes late.
+  const start = () => {
+    try {
+      if (isMac) setupMac(win)
+      else setupWindows(win)
+    } catch (err) {
+      console.error('[updater] failed to start:', err?.message || err)
+    }
   }
+
+  if (!win || win.isDestroyed()) return
+  if (win.isVisible()) start()
+  else win.once('show', start)
 }
 
 module.exports = { initUpdater }

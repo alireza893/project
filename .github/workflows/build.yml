@@ -187,6 +187,24 @@ jobs:
       # Rebuild the download page from what is now on disk, so it lists the new
       # release and drops anything pruning just removed. Both jobs run this;
       # it only reads the directories, so the later one simply wins.
+      # The page's fonts and logos, shipped from the repo so the server never
+      # needs to be touched by hand. Only the Windows job does this: the files
+      # are identical either way, and uploading twice would be wasted work.
+      - name: Upload the page assets
+        if: "runner.os == 'Windows' && !contains(github.ref_name, '-')"
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes "$remote" \
+            'mkdir -p /var/www/updates/assets'
+          scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            src/assets/fonts/Vazirmatn-Regular.woff2 \
+            src/assets/fonts/Vazirmatn-Medium.woff2 \
+            src/assets/fonts/Vazirmatn-Bold.woff2 \
+            build/logo-light.png build/logo-dark.png \
+            "$remote:/var/www/updates/assets/"
+
       - name: Rebuild the download page
         if: "!contains(github.ref_name, '-')"
         shell: bash

@@ -9,6 +9,11 @@
 # It serves the installer files over HTTP and creates a restricted "deploy"
 # user that GitHub Actions uses to upload new builds.
 #
+# This is a ONE-TIME setup. Releases never need it again: everything that
+# changes per release -- the installers, the download page, the fonts and
+# logos -- lives under /var/www/updates, which the deploy user owns and the
+# workflow writes over SSH. The nginx config below is static.
+#
 # This droplet also runs the Telegram bot and its database, so the script is
 # deliberately non-destructive:
 #   - it listens on a dedicated port, never claiming port 80 as default_server
@@ -127,6 +132,23 @@ fi
 
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_ROOT"
 chmod -R 755 "$WEB_ROOT"
+
+# Let the deploy user reload nginx, and nothing else. Without this every
+# nginx change needs a manual root login, which makes routine releases
+# depend on a human running a command by hand.
+#
+# The two commands are fixed and take no arguments, so this grants no path to
+# a root shell: `nginx -t` only validates config, and `systemctl reload nginx`
+# only re-reads it. Writing that config still requires root.
+cat > /etc/sudoers.d/deploy-nginx <<SUDO
+$DEPLOY_USER ALL=(root) NOPASSWD: /usr/sbin/nginx -t, /bin/systemctl reload nginx
+SUDO
+chmod 440 /etc/sudoers.d/deploy-nginx
+# A malformed sudoers file locks out sudo entirely, so validate and roll back.
+if ! visudo -cf /etc/sudoers.d/deploy-nginx >/dev/null 2>&1; then
+  rm -f /etc/sudoers.d/deploy-nginx
+  echo "    WARNING: sudoers rule was rejected; nginx reloads will need root" >&2
+fi
 
 echo "==> Configuring nginx on port $UPDATE_PORT"
 cat > /etc/nginx/sites-available/updates <<NGINX
