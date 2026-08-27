@@ -25,8 +25,15 @@ export default function App() {
   const [authed, setAuthed] = useState(false)
   const [tab, setTab] = useState('dashboard')
   const [editingInvoice, setEditingInvoice] = useState(null)
+  const [appVersion, setAppVersion] = useState('')
 
   useEffect(() => { init() }, [])
+
+  // Read once at startup; comes from the main process, not the bundle, so it
+  // always reflects the installed build.
+  useEffect(() => {
+    window.api?.appVersion?.().then(setAppVersion).catch(() => {})
+  }, [])
 
   const go = (target) => {
     if (target === 'new-invoice') { setEditingInvoice({ fresh: true }); setTab('invoices') }
@@ -104,6 +111,12 @@ export default function App() {
             )
           })}
         </nav>
+
+        {/* Pushed to the bottom: confirms at a glance which version is running,
+            so an applied update is visible without opening anything. */}
+        <p className="mt-auto px-3 pb-1 text-[11px] text-[var(--text-dim)]" dir="ltr">
+          {appVersion ? `v${appVersion}` : ''}
+        </p>
 
       </aside>
 

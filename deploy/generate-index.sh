@@ -153,13 +153,28 @@ cat > "$OUT" <<HTML
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.5);
     }
   }
+  /* Vazirmatn is served from this host: without it the page falls back to
+     Tahoma, which renders Persian poorly. */
+  @font-face {
+    font-family: Vazirmatn; font-style: normal; font-weight: 400;
+    font-display: swap; src: url('/assets/Vazirmatn-Regular.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: Vazirmatn; font-style: normal; font-weight: 500;
+    font-display: swap; src: url('/assets/Vazirmatn-Medium.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: Vazirmatn; font-style: normal; font-weight: 600;
+    font-display: swap; src: url('/assets/Vazirmatn-Bold.woff2') format('woff2');
+  }
+
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 400 17px/1.5 -apple-system, BlinkMacSystemFont, 'SF Pro Text',
-          'Segoe UI', Vazirmatn, Tahoma, sans-serif;
+    font: 400 17px/1.75 Vazirmatn, -apple-system, BlinkMacSystemFont,
+          'Segoe UI', Tahoma, sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
   }
@@ -175,16 +190,14 @@ cat > "$OUT" <<HTML
   .wrap { position: relative; max-width: 720px; margin: 0 auto; padding: 72px 24px 96px; }
 
   .hero { text-align: center; margin-bottom: 44px; }
-  .icon {
-    width: 104px; height: 104px; margin: 0 auto 22px;
-    border-radius: 24px;
-    background: linear-gradient(180deg, #fdfdfd, #e9eaed);
-    border: 1px solid var(--stroke);
-    box-shadow: var(--shadow);
-    display: grid; place-items: center;
-  }
+  /* The app's own icon: the macOS artwork in light mode, the Windows
+     dark-theme artwork in dark mode, so it always sits on a fitting ground. */
+  .icon { width: 104px; height: 104px; margin: 0 auto 22px; display: block; }
+  .icon img { width: 100%; height: 100%; display: block; }
+  .icon .dark { display: none; }
   @media (prefers-color-scheme: dark) {
-    .icon { background: linear-gradient(180deg, #2b2b2e, #1c1c1e); }
+    .icon .light { display: none; }
+    .icon .dark  { display: block; }
   }
   h1 { font-size: 40px; line-height: 1.1; letter-spacing: -.02em; margin: 0 0 10px; font-weight: 600; }
   .sub { color: var(--muted); font-size: 19px; margin: 0; }
@@ -263,11 +276,8 @@ cat > "$OUT" <<HTML
   <div class="wrap">
     <div class="hero">
       <div class="icon">
-        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-          <path d="M16 9h20a3 3 0 0 1 3 3v30l-4.5-3-4.5 3-4.5-3-4.5 3-4.5-3-4.5 3V12a3 3 0 0 1 3-3z"
-                stroke="#0071e3" stroke-width="2.5" stroke-linejoin="round"/>
-          <path d="M20 19h16M20 26h16M20 33h9" stroke="#0071e3" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
+        <img class="light" src="/assets/logo-light.png" alt="پیش‌فاکتور" width="104" height="104">
+        <img class="dark"  src="/assets/logo-dark.png"  alt="" width="104" height="104" aria-hidden="true">
       </div>
       <h1>سامانه پیش‌فاکتور</h1>
       <p class="sub">نسخه $latest — دانلود برای مک و ویندوز</p>

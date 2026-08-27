@@ -170,6 +170,14 @@ server {
         return 200 "ok\n";
     }
 
+    # Fonts and logos for the download page. Content-addressed by name and
+    # rarely changed, so they cache for a long time.
+    location /assets/ {
+        alias /var/www/updates/assets/;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+
     # The download page, rebuilt after every upload by generate-index.sh.
     # Never cached, so a new release shows up immediately.
     location = / {
