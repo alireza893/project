@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   importBackup: () => ipcRenderer.invoke('backup:import'),
   platform: process.platform,
   appVersion: () => ipcRenderer.invoke('app:version'),
+  username: () => ipcRenderer.invoke('app:username'),
 
   /* Update notifications pushed from the main process.
      Each returns an unsubscribe function, so React effects can clean up. */

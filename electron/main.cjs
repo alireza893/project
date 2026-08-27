@@ -137,6 +137,15 @@ ipcMain.handle('auth:login', (_e, username, password) =>
 
 ipcMain.handle('app:version', () => app.getVersion())
 
+/** The signed-in account name, shown next to the profile in the sidebar. */
+ipcMain.handle('app:username', () => {
+  try {
+    return require('node:os').userInfo().username || ''
+  } catch {
+    return ''
+  }
+})
+
 ipcMain.handle('db:read', () => readDb())
 ipcMain.handle('db:write', (_e, db) => writeDb(db))
 

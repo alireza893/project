@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Package, Users, FileText, Settings as SettingsIcon, ArrowRight } from 'lucide-react'
+import { LayoutDashboard, Package, Users, FileText, Settings as SettingsIcon, ArrowRight, LogOut, ChevronUp } from 'lucide-react'
 import { useStore } from './store/useStore'
 import Scene3D from './components/Scene3D'
 import Dashboard from './components/Dashboard'
@@ -11,6 +11,85 @@ import InvoiceEditor from './components/InvoiceEditor'
 import Settings from './components/Settings'
 import Login from './components/Login'
 import { Toast, Button, spring } from './components/ui'
+
+const USER_NAME = 'علیرضا طائریان'
+
+/** Generic avatar: a head-and-shoulders silhouette, tinted to the app accent. */
+function Avatar({ size = 30 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" className="shrink-0" aria-hidden="true">
+      <circle cx="20" cy="20" r="20" className="fill-brand-500/15" />
+      <circle cx="20" cy="15.5" r="6" className="fill-brand-600" />
+      <path d="M8.5 33a11.5 11.5 0 0 1 23 0z" className="fill-brand-600" />
+    </svg>
+  )
+}
+
+/** Sidebar profile with a menu holding the only action there is: sign out. */
+function Profile({ username, version, onLogout }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  // Close on an outside click or Escape, the way a native menu behaves.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div className="relative mt-auto" ref={ref}>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.97 }}
+            transition={{ duration: 0.14 }}
+            className="glass absolute bottom-full right-0 left-0 mb-2 overflow-hidden rounded-xl p-1 shadow-lg"
+          >
+            <button
+              onClick={() => { setOpen(false); onLogout() }}
+              className="no-drag flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-right text-[13px] text-rose-500 transition hover:bg-rose-500/10"
+            >
+              <LogOut size={15} />
+              <span>خروج</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="no-drag flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2 py-2 text-right transition hover:bg-black/5"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Avatar />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12px] font-bold leading-tight">{USER_NAME}</p>
+          <p className="truncate text-[10px] text-[var(--text-dim)]" dir="ltr">
+            {username || '—'}
+          </p>
+        </div>
+        <ChevronUp
+          size={14}
+          className={`shrink-0 text-[var(--text-dim)] transition-transform ${open ? '' : 'rotate-180'}`}
+        />
+      </button>
+
+      <p className="px-2 pb-1 text-[10px] text-[var(--text-dim)]" dir="ltr">
+        {version ? `v${version}` : ''}
+      </p>
+    </div>
+  )
+}
 
 const NAV = [
   { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard },
@@ -26,13 +105,15 @@ export default function App() {
   const [tab, setTab] = useState('dashboard')
   const [editingInvoice, setEditingInvoice] = useState(null)
   const [appVersion, setAppVersion] = useState('')
+  const [username, setUsername] = useState('')
 
   useEffect(() => { init() }, [])
 
-  // Read once at startup; comes from the main process, not the bundle, so it
-  // always reflects the installed build.
+  // Read once at startup; both come from the main process, not the bundle, so
+  // the version always reflects the installed build.
   useEffect(() => {
     window.api?.appVersion?.().then(setAppVersion).catch(() => {})
+    window.api?.username?.().then(setUsername).catch(() => {})
   }, [])
 
   const go = (target) => {
@@ -112,11 +193,9 @@ export default function App() {
           })}
         </nav>
 
-        {/* Pushed to the bottom: confirms at a glance which version is running,
-            so an applied update is visible without opening anything. */}
-        <p className="mt-auto px-3 pb-1 text-[11px] text-[var(--text-dim)]" dir="ltr">
-          {appVersion ? `v${appVersion}` : ''}
-        </p>
+        {/* Pinned to the bottom: who is signed in, the version that is
+            running, and the one action available here. */}
+        <Profile username={username} version={appVersion} onLogout={() => setAuthed(false)} />
 
       </aside>
 
