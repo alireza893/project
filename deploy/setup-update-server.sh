@@ -104,6 +104,27 @@ chmod 700 "/home/$DEPLOY_USER/.ssh"
 chmod 600 "/home/$DEPLOY_USER/.ssh/authorized_keys"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "/home/$DEPLOY_USER/.ssh"
 
+# Ensure the password field is "*" (no password set) rather than "!" (locked).
+# Both refuse password logins, but a "!" can block key-based login too on some
+# sshd configurations. Key authentication is the only way in either way.
+usermod -p '*' "$DEPLOY_USER" 2>/dev/null || true
+
+# Install the deploy key if one was passed in. ssh-copy-id cannot be used for
+# this account: it would need to log in as $DEPLOY_USER, which is exactly the
+# access being set up here.
+#   DEPLOY_PUBKEY="$(cat ~/.ssh/pishfaktor_deploy.pub)" bash setup-update-server.sh
+if [ -n "${DEPLOY_PUBKEY:-}" ]; then
+  auth="/home/$DEPLOY_USER/.ssh/authorized_keys"
+  if grep -qxF "$DEPLOY_PUBKEY" "$auth" 2>/dev/null; then
+    echo "    deploy key is already installed"
+  else
+    printf '%s\n' "$DEPLOY_PUBKEY" >> "$auth"
+    echo "    deploy key installed"
+  fi
+  chown "$DEPLOY_USER:$DEPLOY_USER" "$auth"
+  chmod 600 "$auth"
+fi
+
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_ROOT"
 chmod -R 755 "$WEB_ROOT"
 
@@ -181,14 +202,30 @@ cat <<DONE
 Setup complete. Updates are served on port $UPDATE_PORT.
 The Telegram bot and its database were not touched.
 
-Next: add the GitHub Actions public key so uploads are allowed.
-On your Mac, generate a key pair:
+$(if [ -n "${DEPLOY_PUBKEY:-}" ]; then
+cat <<KEYDONE
+The deploy key is installed. Test it from your Mac:
+
+    ssh -i ~/.ssh/pishfaktor_deploy $DEPLOY_USER@129.212.254.115 'echo works'
+KEYDONE
+else
+cat <<KEYTODO
+Next: install the deploy key so GitHub Actions can upload.
+
+On your Mac, generate the key pair:
 
     ssh-keygen -t ed25519 -f ~/.ssh/pishfaktor_deploy -N "" -C "github-actions"
 
-Then paste the PUBLIC key into this file on the droplet:
+Then re-run this script with the PUBLIC key, as root:
 
-    /home/$DEPLOY_USER/.ssh/authorized_keys
+    scp ~/.ssh/pishfaktor_deploy.pub root@129.212.254.115:/root/
+    ssh root@129.212.254.115 \\
+      'DEPLOY_PUBKEY="\$(cat /root/pishfaktor_deploy.pub)" bash /root/setup-update-server.sh'
+
+Do not use ssh-copy-id for this: it logs in as $DEPLOY_USER, which is the
+very access being granted, so it cannot work until the key is already there.
+KEYTODO
+fi)
 
 Verify the server responds:
 
