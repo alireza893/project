@@ -36,21 +36,31 @@ file_for() {  # platform, version -> path or empty
     win) dir="$WEB_ROOT/win"; ext=exe ;;
     mac) dir="$WEB_ROOT/mac"; ext=dmg ;;
   esac
-  find "$dir" -maxdepth 1 -type f -name "*.$ext" 2>/dev/null |
-    while IFS= read -r f; do
-      [ "$(version_of "$f")" = "$2" ] && { printf '%s' "$f"; break; }
-    done
+  local f
+  # A plain loop, not a pipeline: a `while` on the right of a pipe runs in a
+  # subshell, where `break` cannot return a value and a failing test under
+  # `set -e` aborts the whole script.
+  for f in "$dir"/*."$ext"; do
+    [ -f "$f" ] || continue
+    if [ "$(version_of "$f")" = "$2" ]; then
+      printf '%s' "$f"
+      return 0
+    fi
+  done
+  return 0
 }
 
 # Every version present for either platform, newest first.
-all_versions=$(
-  {
-    find "$WEB_ROOT/win" -maxdepth 1 -type f -name '*.exe' 2>/dev/null
-    find "$WEB_ROOT/mac" -maxdepth 1 -type f -name '*.dmg' 2>/dev/null
-  } | while IFS= read -r f; do
-        v=$(version_of "$f"); [ -n "$v" ] && printf '%s\n' "$v"
-      done | sort -Vru
-)
+collect_versions() {
+  local f v
+  for f in "$WEB_ROOT"/win/*.exe "$WEB_ROOT"/mac/*.dmg; do
+    [ -f "$f" ] || continue
+    v=$(version_of "$f")
+    [ -n "$v" ] && printf '%s\n' "$v"
+  done
+  return 0
+}
+all_versions=$(collect_versions | sort -Vru)
 
 latest=$(printf '%s\n' "$all_versions" | head -1)
 

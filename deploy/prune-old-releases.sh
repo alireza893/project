@@ -45,14 +45,19 @@ prune_dir() {
 
   # Every version present, newest first. sort -V understands 1.10.0 > 1.9.0,
   # which a plain lexical sort gets wrong.
-  local versions
+  # A plain loop, not a pipeline: a `while` on the right of a pipe runs in a
+  # subshell, and a failing test as its last command aborts the script under
+  # `set -e` -- which silently skipped pruning entirely.
+  local versions f v
   versions=$(
-    find "$dir" -maxdepth 1 -type f -name "*.$ext" -print0 2>/dev/null |
-      while IFS= read -r -d '' f; do
-        v=$(version_of "$f")
-        [ -n "$v" ] && printf '%s\n' "$v"
-      done | sort -Vru
+    for f in "$dir"/*."$ext"; do
+      [ -f "$f" ] || continue
+      v=$(version_of "$f")
+      [ -n "$v" ] && printf '%s\n' "$v"
+    done
+    return 0
   )
+  versions=$(printf '%s\n' "$versions" | sort -Vru)
 
   local total
   total=$(printf '%s' "$versions" | grep -c . || true)
