@@ -31,11 +31,13 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["universal"]
+          "arch": [
+            "universal"
+          ]
         }
       ],
       "artifactName": "PishFaktor-${version}.${ext}",
-      "icon": "build/icon.png",
+      "icon": "build/icon.icns",
       "identity": null
     },
     "dmg": {
@@ -45,11 +47,20 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "PishFaktor-Setup-${version}.${ext}",
-      "icon": "build/icon.png"
+      "icon": "build/icon.ico",
+      "publish": [
+        {
+          "provider": "generic",
+          "url": "http://129.212.254.115:8081/updates/win",
+          "channel": "latest"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -64,6 +75,7 @@
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.9",
     "framer-motion": "^13.1.1",
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
